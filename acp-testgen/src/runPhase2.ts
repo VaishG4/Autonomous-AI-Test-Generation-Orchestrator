@@ -3,7 +3,7 @@ import { FsPolicy } from "./policy/fsPolicy.js";
 import { CopilotAcpClient } from "./acp/copilotAcpClient.js";
 import { loadCoverageScope } from "./config/coverageConfig.js";
 import { phase2RepoContext } from "./phases/phase2RepoContext.js";
-// event logging removed: _events.jsonl was deleted to reduce verbosity
+import { logStatus } from "./util/status.js";
 
 async function main() {
   const repo = resolveTargetRepoAbs(process.argv);
@@ -22,11 +22,14 @@ async function main() {
   });
 
   await acp.start();
+  logStatus(repo, "Started ACP client for Phase 2");
   try {
+    logStatus(repo, "Running Phase 2: collecting repo context");
     await phase2RepoContext(repo, acp);
-    console.log("Wrote test/_repo_context.md");
+    logStatus(repo, "Wrote test/_repo_context.md");
   } finally {
     await acp.stop();
+    logStatus(repo, "Stopped ACP client for Phase 2");
   }
 }
 

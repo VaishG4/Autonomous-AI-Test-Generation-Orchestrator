@@ -7,6 +7,7 @@ import { resolveTargetRepoAbs } from "./util/targetRepo.js";
 import { loadCoverageScope } from "./config/coverageConfig.js";
 import { buildTestPlan, writeTestPlan } from "./planning/testFilePlanner.js";
 import { phase3CreateTestFileScaffolds } from "./phases/phase3CreateTestFiles.js";
+import { logStatus } from "./util/status.js";
 
 async function helloAcp(targetRepoAbs: string) {
   const executable = process.env.COPILOT_CLI_PATH ?? "copilot";
@@ -69,19 +70,21 @@ async function main() {
   }
 
   if (cmd === "plan") {
+    logStatus(targetRepoAbs, "Running plan");
     const cov = loadCoverageScope(targetRepoAbs);
     const plan = await buildTestPlan(targetRepoAbs, cov);
     writeTestPlan(targetRepoAbs, plan);
-    console.log(`Wrote ${path.join(targetRepoAbs, "test", "_test_plan.json")} (${plan.length} entries)`);
+    logStatus(targetRepoAbs, `Wrote ${path.join(targetRepoAbs, "test", "_test_plan.json")} (${plan.length} entries)`);
     return;
   }
 
   if (cmd === "init-tests") {
+    logStatus(targetRepoAbs, "Running init-tests");
     const cov = loadCoverageScope(targetRepoAbs);
     const plan = await buildTestPlan(targetRepoAbs, cov);
     writeTestPlan(targetRepoAbs, plan);
     phase3CreateTestFileScaffolds(plan);
-    console.log(`Created empty test files under ${path.join(targetRepoAbs, "test")}`);
+    logStatus(targetRepoAbs, `Created empty test files under ${path.join(targetRepoAbs, "test")}`);
     return;
   }
 
