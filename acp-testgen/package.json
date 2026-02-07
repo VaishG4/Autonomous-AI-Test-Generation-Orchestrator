@@ -1,0 +1,23 @@
+{
+  "name": "acp-testgen",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hello": "tsx src/index.ts hello",
+    "plan": "tsx src/index.ts plan",
+    "init-tests": "tsx src/index.ts init-tests"
+    ,"phase2":"tsx src/runPhase2.ts"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.13.1",
+    "fast-glob": "^3.3.2",
+    "minimatch": "^9.0.5",
+    "toml": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,14 @@
+# Purpose: tells the orchestrator where the repo is and where tests live.
+
+# Path to the repo you want to test (usually parent dir if orchestrator/ is inside it)
+repoRoot: ".."
+
+# Writable tests directory (per your requirement)
+testDir: "test"
+
+# Coverage configuration source
+pyprojectPath: "pyproject.toml"
+
+# Optional overrides (leave empty to derive from coverage config)
+readOnlyDirs: []
+# e.g. ["src"] or ["src/click"]
