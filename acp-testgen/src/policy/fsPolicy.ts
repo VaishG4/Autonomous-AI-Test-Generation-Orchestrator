@@ -57,8 +57,8 @@ export class FsPolicy {
         }
       });
       return ok
-        ? { allow: true, reason: "Edit allowed in /test" }
-        : { allow: false, reason: "Edits only allowed in /test" };
+        ? { allow: true, reason: "Edit allowed in /tests" }
+        : { allow: false, reason: "Edits only allowed in /tests" };
     }
 
     // We run tests ourselves for now → deny execute tool calls

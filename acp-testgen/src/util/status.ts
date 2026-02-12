@@ -11,7 +11,7 @@ export function logStatus(repoRootAbs: string | null, message: string) {
   // Also persist to test/_status.log for inspection (best-effort)
   try {
     if (repoRootAbs) {
-      const dir = path.join(repoRootAbs, "test");
+      const dir = path.join(repoRootAbs, "tests");
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       const p = path.join(dir, "_status.log");
       appendFileSync(p, line, "utf8");

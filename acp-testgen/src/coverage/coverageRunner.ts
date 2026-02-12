@@ -7,14 +7,14 @@ export async function runCoverage(repoRootAbs: string): Promise<{
   pytestStderr: string;
   coverageJsonPath: string;
 }> {
-  const coverageJsonPath = path.join(repoRootAbs, "test", "coverage.json");
-  const coverageFile = path.join(repoRootAbs, "test", ".coverage");
+  const coverageJsonPath = path.join(repoRootAbs, "tests", "coverage.json");
+  const coverageFile = path.join(repoRootAbs, "tests", ".coverage");
 
   const env = {
     ...process.env,
     COVERAGE_FILE: coverageFile,
-    PYTEST_ADDOPTS: `--cache-dir ${path.join(repoRootAbs, "test", ".pytest_cache")}`,
-    PYTHONPYCACHEPREFIX: path.join(repoRootAbs, "test", ".pycache"),
+    PYTEST_ADDOPTS: `--cache-dir ${path.join(repoRootAbs, "tests", ".pytest_cache")}`,
+    PYTHONPYCACHEPREFIX: path.join(repoRootAbs, "tests", ".pycache"),
     PYTHONDONTWRITEBYTECODE: "1",
   };
 

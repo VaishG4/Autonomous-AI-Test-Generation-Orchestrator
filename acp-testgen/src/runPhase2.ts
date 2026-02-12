@@ -11,7 +11,7 @@ async function main() {
   // derive coverage roots
   const cov = loadCoverageScope(repo);
 
-  const policy = new FsPolicy({ repoRootAbs: repo, testDirRel: "test", readRootsRel: cov.readRootsRel });
+  const policy = new FsPolicy({ repoRootAbs: repo, testDirRel: "tests", readRootsRel: cov.readRootsRel });
 
   const acp = new CopilotAcpClient(repo, policy, (e) => {
     // mirror to stdout for live feedback

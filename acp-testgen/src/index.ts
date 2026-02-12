@@ -74,7 +74,7 @@ async function main() {
     const cov = loadCoverageScope(targetRepoAbs);
     const plan = await buildTestPlan(targetRepoAbs, cov);
     writeTestPlan(targetRepoAbs, plan);
-    logStatus(targetRepoAbs, `Wrote ${path.join(targetRepoAbs, "test", "_test_plan.json")} (${plan.length} entries)`);
+    logStatus(targetRepoAbs, `Wrote ${path.join(targetRepoAbs, "tests", "_test_plan.json")} (${plan.length} entries)`);
     return;
   }
 
@@ -84,7 +84,7 @@ async function main() {
     const plan = await buildTestPlan(targetRepoAbs, cov);
     writeTestPlan(targetRepoAbs, plan);
     phase3CreateTestFileScaffolds(plan);
-    logStatus(targetRepoAbs, `Created empty test files under ${path.join(targetRepoAbs, "test")}`);
+    logStatus(targetRepoAbs, `Created empty test files under ${path.join(targetRepoAbs, "tests")}`);
     return;
   }
 

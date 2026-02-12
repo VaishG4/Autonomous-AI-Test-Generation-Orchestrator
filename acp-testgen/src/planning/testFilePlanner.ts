@@ -12,17 +12,34 @@ export async function buildTestPlan(repoRootAbs: string, covScope: { readRootsRe
   for (const r of roots) {
     const glob = path.join(r, "**", "*.py");
     const matches = await fg([glob], { cwd: repoRootAbs, onlyFiles: true, dot: false });
-    for (const m of matches) files.add(m);
+    for (const m of matches) {
+      // ignore existing test files when collecting source files
+      if (m.startsWith("tests/")) continue;
+      files.add(m);
+    }
+  }
+
+  // If no files found for the configured roots, try a common alternative
+  // layout where sources live under `src/<root>` (some projects use that).
+  if (files.size === 0) {
+    for (const r of roots) {
+      const alt = path.join("src", r, "**", "*.py");
+      const matches = await fg([alt], { cwd: repoRootAbs, onlyFiles: true, dot: false });
+      for (const m of matches) {
+        if (m.startsWith("tests/")) continue;
+        files.add(m);
+      }
+    }
   }
 
   const out: TestPlanEntry[] = [];
   for (const rel of Array.from(files).sort()) {
-    // ignore tests under test/ if any
-    if (rel.startsWith("test/")) continue;
+    // ignore tests under tests/ if any
+    if (rel.startsWith("tests/")) continue;
     const prodAbs = path.join(repoRootAbs, rel);
     const base = path.basename(rel, ".py");
     const testFileName = `test_${base}.py`;
-    const testAbs = path.join(repoRootAbs, "test", testFileName);
+    const testAbs = path.join(repoRootAbs, "tests", testFileName);
     // produce prodRel in POSIX form for coverage lookup
     const prodRel = toPosix(rel);
     out.push({ prodRel, prodAbs, testAbs });
@@ -32,8 +49,8 @@ export async function buildTestPlan(repoRootAbs: string, covScope: { readRootsRe
 }
 
 export function writeTestPlan(repoRootAbs: string, plan: TestPlanEntry[]) {
-  const dir = path.join(repoRootAbs, "test");
-  // Ensure `test` is a directory we can write into. If a file named `test`
+  const dir = path.join(repoRootAbs, "tests");
+  // Ensure `tests` is a directory we can write into. If a file named `tests`
   // already exists, surface a helpful error instead of failing with ENOENT.
   if (existsSync(dir)) {
     try {
@@ -54,7 +71,7 @@ export function writeTestPlan(repoRootAbs: string, plan: TestPlanEntry[]) {
 
 export function readTestPlan(repoRootAbs: string): { entries: TestPlanEntry[] } | null {
   try {
-    const p = path.join(repoRootAbs, "test", "_test_plan.json");
+    const p = path.join(repoRootAbs, "tests", "_test_plan.json");
     const raw = require("node:fs").readFileSync(p, "utf8");
     return JSON.parse(raw);
   } catch {

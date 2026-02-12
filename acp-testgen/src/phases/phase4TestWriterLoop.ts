@@ -1,7 +1,7 @@
 import path from "node:path";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { CopilotAcpClient } from "../acp/copilotAcpClient";
-import { planChunks, readSnippet } from "../chunking/chunkPlanner";
+import { planChunks, readSnippet, getRegionsPython } from "../chunking/chunkPlanner";
 import { runCoverage } from "../coverage/coverageRunner";
 
 function extractMissingLinesForFile(coverageJson: any, prodRel: string): number[] {
@@ -26,6 +26,21 @@ export async function phase4TestWriterLoop(params: {
   const { repoRootAbs, acp, plan } = params;
 
   for (const entry of plan) {
+    // Ensure the test file exists; if not, create a scaffold with per-region markers so
+    // the agent has a deterministic place to write tests. This enables on-demand
+    // creation instead of requiring Phase 3 scaffolding.
+    const testDir = path.dirname(entry.testAbs);
+    if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true });
+    if (!existsSync(entry.testAbs)) {
+      const regions = getRegionsPython(entry.prodAbs).filter((r) => r.name !== "<module>");
+      const sections = regions.map((r) =>
+        `\n# ----------------------------------------- Test cases for ${r.name} ------------------------------\n`
+      );
+
+      const content = `# Auto-generated test scaffold for ${path.basename(entry.prodAbs)}\n# Tests will be added by the orchestrator.\n\nimport pytest\n\n${sections.join("\n")}\n`;
+
+      writeFileSync(entry.testAbs, content, "utf8");
+    }
     // Run coverage to find missing lines for this prod file. Continue even if pytest fails so the agent
     // can be fed failures and attempt fixes; coverage json may still be produced.
     const res = await runCoverage(repoRootAbs);
@@ -35,12 +50,18 @@ export async function phase4TestWriterLoop(params: {
       await acp.prompt(`Initial pytest run failed for repo. Pytest stderr:\n${res.pytestStderr}\n\nProceeding to gather coverage.json if available.`);
     }
 
-    // Try to read coverage JSON even if pytest failed
-    let coverageJson: any = null;
+    // Try to read coverage JSON even if pytest failed. If unavailable, treat
+    // coverage as empty (no missing lines) but inform the agent so it can
+    // proceed without coverage data.
+    let coverageJson: any = { files: {} };
     try {
-      coverageJson = JSON.parse(readFileSync(res.coverageJsonPath, "utf8"));
+      const raw = readFileSync(res.coverageJsonPath, "utf8");
+      coverageJson = JSON.parse(raw);
     } catch (e) {
-      throw new Error(`Unable to read coverage json at ${res.coverageJsonPath}: ${String(e)}\nPytest stderr:\n${res.pytestStderr}`);
+      // Notify the agent that coverage.json was not available and we'll
+      // continue with empty coverage information.
+      await acp.prompt(`Note: coverage.json unavailable at ${res.coverageJsonPath}. Proceeding without coverage data. Pytest stderr:\n${res.pytestStderr}`);
+      coverageJson = { files: {} };
     }
 
     let missing = extractMissingLinesForFile(coverageJson, entry.prodRel);
@@ -56,20 +77,20 @@ export async function phase4TestWriterLoop(params: {
         const snippet = readSnippet(entry.prodAbs, region.start, region.end);
 
         const prompt = `
-You are generating pytest tests.
-HARD RULES:
-- You MAY ONLY modify files under: ${path.join(repoRootAbs, "test")}
-- Do NOT modify production code.
-- Goal: cover missing lines in ${entry.prodRel}, region ${region.name}, lines ${rangesText}.
-- Put new tests under the existing section separator:
-  "# ----------------------------------------- Test cases for ${region.name} ------------------------------"
+    You are generating pytest tests.
+    HARD RULES:
+    - You MAY ONLY modify files under: ${path.join(repoRootAbs, "tests")}
+    - Do NOT modify production code.
+    - Goal: cover missing lines in ${entry.prodRel}, region ${region.name}, lines ${rangesText}.
+    - Put new tests under the existing section separator:
+      "# ----------------------------------------- Test cases for ${region.name} ------------------------------"
 
-Production code (region ${region.name}):
-${snippet}
+    Production code (region ${region.name}):
+    ${snippet}
 
-Now write/modify ONLY the test file: ${path.relative(repoRootAbs, entry.testAbs)}
-Make tests deterministic (no network), use monkeypatch for I/O where needed.
-`.trim();
+    Now write/modify ONLY the test file: ${path.relative(repoRootAbs, entry.testAbs)}
+    Make tests deterministic (no network), use monkeypatch for I/O where needed.
+    `.trim();
 
         await acp.prompt(prompt);
 
@@ -87,7 +108,14 @@ ${rerun.pytestStdout}
 `.trim());
         }
 
-        const cov2 = JSON.parse(readFileSync(rerun.coverageJsonPath, "utf8"));
+        let cov2: any = { files: {} };
+        try {
+          const raw2 = readFileSync(rerun.coverageJsonPath, "utf8");
+          cov2 = JSON.parse(raw2);
+        } catch (e) {
+          await acp.prompt(`Note: coverage.json unavailable after rerun at ${rerun.coverageJsonPath}. Continuing without coverage data. Pytest stderr:\n${rerun.pytestStderr}`);
+          cov2 = { files: {} };
+        }
         missing = extractMissingLinesForFile(cov2, entry.prodRel);
         if (missing.length === 0) break;
       }

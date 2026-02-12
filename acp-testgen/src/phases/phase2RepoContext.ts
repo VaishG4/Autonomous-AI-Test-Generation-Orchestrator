@@ -27,7 +27,7 @@ README:
 ${readme}
 `.trim();
 
-  // Ask copilot to produce the summary text; orchestrator writes it into /test.
+  // Ask copilot to produce the summary text; orchestrator writes it into /tests.
   // (Keeps our write-path deterministic and still obeys your policy.)
   let collected = "";
   await acpClient.prompt(prompt); // agent output comes via streaming events in UI
@@ -42,5 +42,5 @@ ${readme}
     collected = "# Repo Context\n\n(Agent produced no content)\n";
   }
 
-  writeFileSync(path.join(repoRootAbs, "test", "_repo_context.md"), collected, "utf8");
+  writeFileSync(path.join(repoRootAbs, "tests", "_repo_context.md"), collected, "utf8");
 }

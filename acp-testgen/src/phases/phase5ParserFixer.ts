@@ -14,7 +14,7 @@ export async function phase5ParserFixer(params: {
   acp: CopilotAcpClient;
   prodRel: string; // "src/click/parser.py"
   prodAbs: string;
-  testAbs: string; // "test/test_parser.py"
+  testAbs: string; // "tests/test_parser.py"
 }) {
   const { repoRootAbs, acp, prodRel, prodAbs, testAbs } = params;
 
