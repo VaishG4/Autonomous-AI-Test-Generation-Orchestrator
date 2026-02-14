@@ -9,6 +9,7 @@
     "init-tests": "tsx src/index.ts init-tests"
     ,"phase2":"tsx src/runPhase2.ts"
     ,"phase4":"tsx src/runPhase4.ts"
+    ,"phase5":"tsx src/runPhase5.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.13.1",

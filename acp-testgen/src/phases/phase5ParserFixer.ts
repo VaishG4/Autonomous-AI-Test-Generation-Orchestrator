@@ -9,6 +9,15 @@ function getMissing(coverageJson: any, prodRel: string): number[] {
   return entry?.missing_lines ?? [];
 }
 
+function getMissingFromSummary(summary: any, prodRel: string): { missing_lines: number[]; missing_branches: any[]; percent: number | null } {
+  if (!summary || !summary.files) return { missing_lines: [], missing_branches: [], percent: null };
+  const key = prodRel in summary.files ? prodRel : prodRel.replace(/\\/g, "/");
+  const entry = summary.files[key];
+  if (!entry) return { missing_lines: [], missing_branches: [], percent: null };
+  const percent = entry.summary?.percent_covered ?? null;
+  return { missing_lines: entry.missing_lines ?? [], missing_branches: entry.missing_branches ?? [], percent };
+}
+
 export async function phase5ParserFixer(params: {
   repoRootAbs: string;
   acp: CopilotAcpClient;
@@ -20,11 +29,43 @@ export async function phase5ParserFixer(params: {
 
   while (true) {
     const res = await runCoverage(repoRootAbs);
-    if (!res.ok) {
-      throw new Error(`pytest failed before fixing.\n${res.pytestStderr}\n${res.pytestStdout}`);
+
+    // Prefer the reduced summary produced by runCoverage when available.
+    let missing: number[] = [];
+    let missingBranches: any[] = [];
+    let percentCovered: number | null = null;
+
+    if (res.coverageSummary) {
+      const constinfo: any = getMissingFromSummary(res.coverageSummary, prodRel);
+      missing = constinfo.missing_lines;
+      missingBranches = constinfo.missing_branches;
+      percentCovered = constinfo.percent;
+    } else if (res.coverageSummaryPath) {
+      try {
+        const summ = JSON.parse(readFileSync(res.coverageSummaryPath, "utf8"));
+        const constinfo: any = getMissingFromSummary(summ, prodRel);
+        missing = constinfo.missing_lines;
+        missingBranches = constinfo.missing_branches;
+        percentCovered = constinfo.percent;
+      } catch (e) {
+        // fall back to raw coverage.json
+      }
     }
-    const cov = JSON.parse(readFileSync(res.coverageJsonPath, "utf8"));
-    const missing = getMissing(cov, prodRel);
+
+    let cov: any = undefined;
+    if (missing.length === 0) {
+      // fallback: read the full coverage.json to determine missing lines
+      try {
+        cov = JSON.parse(readFileSync(res.coverageJsonPath, "utf8"));
+        missing = getMissing(cov, prodRel);
+      } catch (e) {
+        if (!res.ok) {
+          throw new Error(`pytest failed before fixing.\n${res.pytestStderr}\n${res.pytestStdout}`);
+        }
+      }
+    }
+    
+    if (missing.length === 0) break;
     if (missing.length === 0) break;
 
     // “one set of missing lines at a time”
@@ -35,12 +76,24 @@ export async function phase5ParserFixer(params: {
     const snippet = readSnippet(prodAbs, region.start, region.end);
 
     await acp.prompt(`
-You are fixing coverage for ${prodRel}.
-You may ONLY edit: ${path.relative(repoRootAbs, testAbs)}
-Do NOT edit any other file.
+Run the test cases using the command "pytest --cov --cov-config=.coveragerc --cov-report=term-missing".
+Target file: "${prodRel}" (test file: "${path.relative(repoRootAbs, testAbs)}").
 
-Target missing lines: ${rangesText} (region ${region.name})
-Add/modify tests ONLY under:
+Current coverage for this file: ${percentCovered ?? "unknown"} %.
+Missing lines: ${missing.join(", ") || "(none)"}.
+Missing branches: ${JSON.stringify(missingBranches || [])}.
+
+You need to add/modify the test cases for the missing lines only, one set at a time.
+Take one missing-lines set and add/modify the tests accordingly, then run the tests.
+If the tests fail, fix them and retry; then move to the next missing-lines set.
+Proceed until coverage for ${prodRel} is 100%.
+
+You must only edit: ${path.relative(repoRootAbs, testAbs)} and no other files.
+Work only in ${path.relative(repoRootAbs, testAbs)}; do not modify other files.
+
+If you attempt to cover the same missing-lines set more than 8 times, stop and report the situation.
+
+Also add a separation comment in the test file for test cases grouped by function in the main file, for example:
 "# ----------------------------------------- Test cases for ${region.name} ------------------------------"
 
 Production snippet:
